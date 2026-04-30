@@ -1,4 +1,4 @@
-module github.com/jfisher/kvc
+module github.com/fish-not-phish/kvc
 
 go 1.22
 
