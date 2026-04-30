@@ -1,6 +1,6 @@
 # Contributing to kvc
 
-Thanks for your interest. `kvc` is small on purpose — every feature
+Thanks for your interest. `kvc` is small on purpose. Every feature
 expands the attack surface of a security tool, so the bar for additions
 is high. This document describes what to expect.
 
@@ -21,7 +21,7 @@ is high. This document describes what to expect.
 
 - Bug fixes, especially in placeholder parsing, Vault auth, keyring
   handling, or subprocess invocation.
-- Documentation improvements — clearer examples, fixed typos, better
+- Documentation improvements: clearer examples, fixed typos, better
   threat-model framing.
 - Security hardening that doesn't add operational complexity (e.g.
   zeroing more buffers, tightening regex, refusing footgun configurations).
@@ -70,7 +70,7 @@ real Vault paths you have read access to.
 - Keep changes focused. One concern per PR.
 - Update relevant docs (README, CLAUDE.md, SECURITY.md) if your change
   affects user-facing behavior or the threat model.
-- Don't bump the version yourself — releases are tagged by the maintainer.
+- Don't bump the version yourself. Releases are tagged by the maintainer.
 
 ## Reporting security issues
 

@@ -1,11 +1,63 @@
 # kvc
 
 Vault-backed secret injection for Docker Compose. `kvc` itself never
-writes plaintext to disk — it pipes the resolved compose YAML to
+writes plaintext to disk. It pipes the resolved compose YAML to
 `docker compose` via stdin and passes `.env` values through subprocess
 environment. Once values reach Docker, plaintext **does** land on disk
 in `/var/lib/docker/containers/<id>/config.v2.json` (the same place
-`docker inspect` reads from); see the [threat model](#threat-model--what-we-do-and-dont-protect-against) for the full picture.
+`docker inspect` reads from); see the [threat model](#threat-model) for the full picture.
+
+## Why kvc?
+
+The main threat kvc defends against is **plaintext secrets sitting on
+disk at rest**.
+
+In a typical Docker Compose setup, credentials live in plaintext in
+compose YAML and (more commonly) a sibling `.env` file. Those files
+get backed up, synced to cloud drives, accidentally committed to git,
+included in disk images, and (most acutely) scraped by info-stealing
+malware that specifically hunts for files named `.env`. Once
+exfiltrated, every credential in the file is compromised, and rotating
+across many stacks is painful and incomplete.
+
+With kvc, those files contain only placeholders like
+`"@@kv/myapp/db#password@@"`. Plaintext exists only in Vault (encrypted
+at rest, audited, ACL'd), briefly in the `kvc` and `docker compose`
+processes during `up`, and (once the stack is running) in Docker's
+own container state files (see [threat model](#threat-model)).
+
+Concretely, this defeats:
+
+- **Info-stealer malware exfiltrating `.env` files.** RedLine, Lumma,
+  Stealc and similar families specifically grep for `.env` files and
+  ship them off. With kvc, what they ship is a list of `@@…@@`
+  strings, useless without your Vault credentials.
+- **Accidental git commits.** A `.env` or compose file pushed to a
+  public repo (one of the leading sources of credential leaks on
+  GitHub) leaks placeholders, not credentials.
+- **Backups, cloud sync, and disk forensics.** `.env` files routinely
+  end up in iCloud / Dropbox / Google Drive folders, nightly backup
+  tarballs, rsync mirrors, and the disks of stolen or discarded
+  laptops. None of that contains plaintext anymore.
+- **Misconfigured file permissions.** A `.env` that's mode 644, or
+  sitting in a world-readable directory, exposes only placeholders to
+  other users on the host.
+- **Secret rotation blast radius.** When a credential is compromised,
+  you rotate once in Vault and every stack that references it picks up
+  the new value on the next `kvc up`. No `find . -name .env | xargs
+  sed` across your homelab.
+- **Centralized audit trail.** Vault logs every secret read, so you
+  have a record of what got pulled, when, and by whom (a Vault feature
+  kvc routes through).
+
+**What kvc is not.** Once a stack is running, `docker inspect` shows
+the resolved env in plaintext to anyone with docker access. An
+attacker already running code as you on this host can use the cached
+Vault token, or wait for you to type your password, to resolve
+placeholders themselves. kvc raises the bar against *passive disk*
+attacks (file copies, backups, malware that scrapes files); it doesn't
+replace endpoint security. Read the full [threat model](#threat-model)
+before relying on it.
 
 ## How it works
 
@@ -19,7 +71,7 @@ kvc up
   └── substitutes docker-compose.yml values in memory
   └── resolves .env values in memory and exposes them as subprocess env
   └── pipes the substituted YAML to `docker compose --env-file /dev/null -f - up -d`
-  └── exits — plaintext is gone, no temp files
+  └── exits. Plaintext is gone, no temp files.
 ```
 
 ## Install
@@ -68,9 +120,9 @@ keyring_max_ttl = "8h"
 In any value position in your compose file, write
 `"@@<mount>/<path>#<key>@@"`:
 
-- `<mount>` — KV v2 mount (the first slash-segment).
-- `<path>` — path under that mount (everything between the first slash and `#`).
-- `<key>` — which field of the secret to read.
+- `<mount>`: KV v2 mount (the first slash-segment).
+- `<path>`: path under that mount (everything between the first slash and `#`).
+- `<key>`: which field of the secret to read.
 
 ```yaml
 services:
@@ -83,11 +135,11 @@ services:
 ```
 
 The mount is inline, so a single compose file can pull from multiple Vault
-mounts. ACL design is your problem — write a policy per mount that grants
+mounts. ACL design is your problem; write a policy per mount that grants
 the deploying user read on the paths it needs.
 
 **Always quote placeholders.** `@` is a reserved YAML indicator, so a bare
-`KEY: @@foo@@` is technically invalid YAML — `kvc up` survives because it
+`KEY: @@foo@@` is technically invalid YAML. `kvc up` survives because it
 substitutes before handing the file to `docker compose`, but anything else
 that reads the raw file (`docker compose down -f file`, `docker compose
 config`, `yamllint`, an IDE's YAML check) will reject it. Wrap every
@@ -95,7 +147,7 @@ placeholder in double quotes (`"@@foo@@"`); single quotes work too. `kvc
 check` warns when it finds unquoted placeholders.
 
 **Placeholders must occupy a whole YAML value.** `password: "@@foo@@"` is
-fine. Embedded forms like `args: ["--pwd=@@foo@@"]` are not — substitution
+fine. Embedded forms like `args: ["--pwd=@@foo@@"]` are not. Substitution
 emits a quoted YAML scalar, so the placeholder needs to be a complete value,
 not a substring.
 
@@ -120,14 +172,14 @@ interpolation rather than inlining `environment:` in the compose file.
 | `env_file: .env` directive in compose.yml           | ✗      |
 | Recursive `${VAR}` expansion within `.env` values   | ✗      |
 
-The `✗` cases are not bugs — they're places where docker compose owns the
+The `✗` cases are not bugs. They're places where docker compose owns the
 parsing path and `kvc` can't intercept it without rewriting the YAML.
 Workarounds for each are in the **.env caveats** subsection below.
 
 Placeholders in `.env` values are resolved in memory just like the compose
 file, then exposed to `docker compose` as **subprocess environment** so
 `${VAR}` interpolation in the YAML picks them up. The on-disk `.env` is
-never rewritten — placeholders stay as `@@…@@` at rest.
+never rewritten; placeholders stay as `@@…@@` at rest.
 
 ```
 # .env
@@ -155,12 +207,12 @@ that won't resolve.
 
 - **No recursive `${VAR}` expansion within `.env` values.** `kvc` parses
   `.env` line-by-line and substitutes `@@…@@` placeholders only. If you
-  reference one `.env` key from another (`FOO=${BAR}_x`), that won't expand
-  — `kvc` passes the literal string to docker. Move such logic to
+  reference one `.env` key from another (`FOO=${BAR}_x`), that won't expand;
+  `kvc` passes the literal string to docker. Move such logic to
   compose.yml's `environment:` instead, where docker handles it.
 - **`env_file:` directive in compose.yml is unsupported with placeholders.**
   When compose has `env_file: .env`, docker reads the file directly into
-  the container's environment — the subprocess-env trick can't intercept
+  the container's environment. The subprocess-env trick can't intercept
   it, and the container would receive literal `@@…@@` strings. Use
   `${VAR}` interpolation instead.
 - **`kvc` always passes `--env-file /dev/null` to docker compose** so
@@ -196,12 +248,12 @@ token in the **Linux kernel keyring** (`@s` session keyring) with TTL =
 prompt until the entry expires or the session ends.
 
 Set `cache_tokens = false` in the config (or pass `--no-cache`) to re-prompt
-on every invocation. Only the bounded, revocable token is ever cached —
-**never the password.**
+on every invocation. Only the bounded, revocable token is ever cached.
+**Never the password.**
 
 `kvc logout` revokes the token server-side and removes it from the keyring.
 
-## Threat model — what we do and don't protect against
+## Threat model
 
 **What `kvc` itself protects:**
 
@@ -209,7 +261,7 @@ on every invocation. Only the bounded, revocable token is ever cached —
   `docker compose -f -` via stdin; resolved `.env` values go via subprocess
   environment. `kvc` itself never writes a temp file.
 - No password in argv, env, or shell history. TTY read only.
-- Vault token lives in the kernel keyring only (`@s` session keyring) —
+- Vault token lives in the kernel keyring only (`@s` session keyring),
   never on disk, dies on session end or `kvc logout`.
 - No long-running daemon, no docker socket exposure, no API surface.
 
@@ -218,7 +270,7 @@ on every invocation. Only the bounded, revocable token is ever cached —
 - **`/var/lib/docker/containers/<id>/config.v2.json` stores the full env
   array in plaintext.** This is where `docker inspect` reads from. Anyone
   with root, anyone in the host's `docker` group, or anyone who can read
-  `/var/lib/docker/` sees the secrets. This is plain Docker behavior — the
+  `/var/lib/docker/` sees the secrets. This is plain Docker behavior; the
   only way to keep secrets out of this file is Swarm-mode `docker secret`s
   mounted at `/run/secrets/<name>` (a tmpfs), which the target audience
   doesn't run. If you need this, run Swarm.
@@ -231,7 +283,7 @@ on every invocation. Only the bounded, revocable token is ever cached —
 **Other residual risks:**
 
 - **Bootstrap.** If Vault/OpenBao is itself deployed via Docker Compose on
-  this host, `kvc` cannot deploy *it* — chicken/egg. Vault's own compose
+  this host, `kvc` cannot deploy *it* (chicken/egg). Vault's own compose
   stack must use a plain `.env` file.
 - **Process memory.** Plaintext exists briefly in the `kvc` and
   `docker compose` processes during stack-up. We zero the password buffer,
@@ -257,7 +309,7 @@ specific key inside a secret:
 Group related credentials at one path (e.g. an app's DB user + password +
 DSN under the same secret) so they rotate together and share one ACL
 boundary. If you'd rather have one secret per credential, just store one
-key per path — `kvc` doesn't care, but every placeholder still has
+key per path. `kvc` doesn't care, but every placeholder still has
 to name its key explicitly with `#<key>`.
 
 ## Requirements
