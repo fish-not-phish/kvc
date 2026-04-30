@@ -1,0 +1,20 @@
+services:
+  smoketest:
+    image: alpine:3
+    container_name: kvc-smoketest
+    environment:
+      # Inline placeholder — substituted in the YAML before docker sees it.
+      # Demonstrates pulling one key out of a multi-key Vault secret.
+      TEST_USER: "@@<mount>/<path>#<key>@@"
+
+      # ${VAR} interpolation — value lives in the .env file alongside this
+      # compose, where kvc resolves the placeholder and exposes it via
+      # subprocess env.
+      EXAMPLE_API_KEY: ${EXAMPLE_API_KEY}
+
+      # Plain (non-secret) value passed through .env.
+      LOG_LEVEL: ${LOG_LEVEL}
+
+      # Plain (non-secret) value inline.
+      APP_NAME: kvc-smoketest
+    command: sh -c 'env | grep -E "^(TEST_USER|EXAMPLE_API_KEY|LOG_LEVEL|APP_NAME)="; tail -f /dev/null'

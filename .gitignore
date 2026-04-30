@@ -1,0 +1,34 @@
+# Compiled binary (the build artifact, in repo root)
+/kvc
+
+# Go build/test artifacts
+*.exe
+*.test
+*.out
+*.cover
+coverage.txt
+
+# Build/dist directories (in case make/release scripts populate them)
+/bin/
+/dist/
+/build/
+
+# Editor / IDE state
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Local environment files (a real user's secrets-bearing .env should never be
+# committed). Re-include the documented test fixture.
+.env
+!test/.env
+
+# Claude Code local overrides (project-level settings.json may be shared, but
+# the *.local.json variant is per-user — never commit it).
+.claude/settings.local.json
