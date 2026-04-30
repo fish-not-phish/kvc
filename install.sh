@@ -6,7 +6,7 @@
 #   PREFIX=$HOME/.local ./install.sh   # install somewhere other than /usr/local
 #
 # Or, with Go already installed and a published module path:
-#   go install github.com/jfisher/kvc@latest
+#   go install github.com/fish-not-phish/kvc@latest
 set -eu
 
 PREFIX="${PREFIX:-/usr/local}"

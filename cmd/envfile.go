@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jfisher/kvc/internal/compose"
-	"github.com/jfisher/kvc/internal/dotenv"
+	"github.com/fish-not-phish/kvc/internal/compose"
+	"github.com/fish-not-phish/kvc/internal/dotenv"
 )
 
 // composeCandidates is the search order docker compose itself uses when

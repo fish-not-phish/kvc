@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jfisher/kvc/internal/config"
-	"github.com/jfisher/kvc/internal/keyring"
-	"github.com/jfisher/kvc/internal/vault"
+	"github.com/fish-not-phish/kvc/internal/config"
+	"github.com/fish-not-phish/kvc/internal/keyring"
+	"github.com/fish-not-phish/kvc/internal/vault"
 	"github.com/spf13/cobra"
 )
 

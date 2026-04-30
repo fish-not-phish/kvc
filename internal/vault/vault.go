@@ -9,9 +9,9 @@ import (
 	"time"
 
 	vaultapi "github.com/hashicorp/vault/api"
-	"github.com/jfisher/kvc/internal/config"
-	"github.com/jfisher/kvc/internal/keyring"
-	"github.com/jfisher/kvc/internal/tty"
+	"github.com/fish-not-phish/kvc/internal/config"
+	"github.com/fish-not-phish/kvc/internal/keyring"
+	"github.com/fish-not-phish/kvc/internal/tty"
 )
 
 type Client struct {

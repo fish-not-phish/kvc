@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/jfisher/kvc/internal/config"
-	"github.com/jfisher/kvc/internal/tty"
+	"github.com/fish-not-phish/kvc/internal/config"
+	"github.com/fish-not-phish/kvc/internal/tty"
 	"github.com/spf13/cobra"
 )
 
