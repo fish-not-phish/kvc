@@ -33,9 +33,9 @@ API_TOKEN=@@kv/myapp/api#token@@
 kvc up          # auth → fetch → substitute → pipe to docker compose
 ```
 
-Info-stealers that exfiltrate your `.env`, accidental git commits, backup
-tarballs, and cloud sync all see `@@…@@` strings, which are useless without your
-Vault credentials.
+Anyone who gets hold of your files, malware, an accidental git push, a
+backup, only ever sees the `@@…@@` placeholder strings. The actual secrets
+never leave Vault.
 
 ## Why kvc?
 
