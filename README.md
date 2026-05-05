@@ -13,7 +13,7 @@ in `/var/lib/docker/containers/<id>/config.v2.json` (the same place
 
 ## Before and after
 
-**Before** — credentials sit on disk in plaintext:
+**Before**: credentials sit on disk in plaintext:
 
 ```sh
 # .env
@@ -21,7 +21,7 @@ DB_PASSWORD=hunter2
 API_TOKEN=sk-abc123
 ```
 
-**After** — only placeholders on disk; secrets live in Vault:
+**After**: only placeholders on disk; secrets live in Vault:
 
 ```sh
 # .env
