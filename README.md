@@ -34,7 +34,7 @@ kvc up          # auth → fetch → substitute → pipe to docker compose
 ```
 
 Info-stealers that exfiltrate your `.env`, accidental git commits, backup
-tarballs, and cloud sync all see `@@…@@` strings — useless without your
+tarballs, and cloud sync all see `@@…@@` strings, which are useless without your
 Vault credentials.
 
 ## Why kvc?
