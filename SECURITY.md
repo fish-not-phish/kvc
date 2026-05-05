@@ -7,7 +7,7 @@ welcome responsible disclosure.
 
 **Do not open a public GitHub issue for security vulnerabilities.**
 
-Instead, email the maintainer directly. Include:
+Instead, email **jfisher@fish-not-phish.com**. Include:
 
 - A clear description of the issue and its impact.
 - Steps to reproduce (or a proof-of-concept if you have one).

@@ -45,7 +45,7 @@ is high. This document describes what to expect.
 ## Development setup
 
 ```sh
-git clone <your fork> kvc && cd kvc
+git clone https://github.com/fish-not-phish/kvc.git kvc && cd kvc
 go build ./...
 go vet ./...
 go test ./...
@@ -53,7 +53,7 @@ go test ./...
 
 The smoketest fixture in `test/` expects a Vault/OpenBao instance with
 KV v2 paths matching the placeholders. For local development against a
-real Vault, copy `test/docker-compose.yml` and `test/.env` somewhere else
+real Vault, copy `test/docker-compose.yml` and `test/.env.example` somewhere else
 and substitute the template placeholders (`<mount>/<path>#<key>`) with
 real Vault paths you have read access to.
 

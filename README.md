@@ -1,11 +1,41 @@
 # kvc
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Go 1.22+](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go&logoColor=white)](https://go.dev/dl/)
+[![Linux only](https://img.shields.io/badge/platform-Linux-lightgrey?logo=linux&logoColor=white)](https://www.kernel.org/)
+
 Vault-backed secret injection for Docker Compose. `kvc` itself never
 writes plaintext to disk. It pipes the resolved compose YAML to
 `docker compose` via stdin and passes `.env` values through subprocess
 environment. Once values reach Docker, plaintext **does** land on disk
 in `/var/lib/docker/containers/<id>/config.v2.json` (the same place
 `docker inspect` reads from); see the [threat model](#threat-model) for the full picture.
+
+## Before and after
+
+**Before** — credentials sit on disk in plaintext:
+
+```sh
+# .env
+DB_PASSWORD=hunter2
+API_TOKEN=sk-abc123
+```
+
+**After** — only placeholders on disk; secrets live in Vault:
+
+```sh
+# .env
+DB_PASSWORD=@@kv/myapp/db#password@@
+API_TOKEN=@@kv/myapp/api#token@@
+```
+
+```sh
+kvc up          # auth → fetch → substitute → pipe to docker compose
+```
+
+Info-stealers that exfiltrate your `.env`, accidental git commits, backup
+tarballs, and cloud sync all see `@@…@@` strings — useless without your
+Vault credentials.
 
 ## Why kvc?
 
