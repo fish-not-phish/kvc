@@ -106,6 +106,20 @@ kvc up
 
 ## Install
 
+### Via `go install`
+
+```sh
+go install github.com/fish-not-phish/kvc@latest
+```
+
+The binary lands in `$GOPATH/bin` (usually `~/go/bin`). Make sure that's on your PATH:
+
+```sh
+export PATH="$PATH:$(go env GOPATH)/bin"
+```
+
+Add that line to your `~/.bashrc` or `~/.zshrc` to make it permanent.
+
 ### From source (requires Go 1.22+)
 
 ```sh
@@ -120,12 +134,6 @@ Or via the Makefile:
 ```sh
 make build       # produces ./kvc
 sudo make install
-```
-
-### Via `go install`
-
-```sh
-go install github.com/fish-not-phish/kvc@latest
 ```
 
 ## First-time setup
