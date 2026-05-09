@@ -38,17 +38,25 @@
 
 ## Authentication
 
-### Userpass (default)
+### Userpass
 
 - Username is set once via `kvc init` and saved to `~/.config/kvc/config.toml`.
 - Password is prompted on every uncached invocation. Read via TTY, never via argv or env.
 - Auth call: `POST /v1/auth/userpass/login/<username>` with `{"password": "<pw>"}` → returns a client token + lease duration.
 
-### Raw token (escape hatch)
+### Config override flags
 
-- `kvc up --token-stdin` reads a Vault token from stdin instead of prompting for a password.
-- Intended for scripted deploys where the operator has pre-issued a long-lived or short-TTL token from the Vault UI/API.
-- Token-stdin mode never writes to the keyring.
+`--vault-addr`, `--username`, and `--password-stdin` can be passed to `kvc up` and `kvc check` to override (or replace) values from `~/.config/kvc/config.toml`. Resolution order: CLI flag > config file > prompt.
+
+- `--vault-addr <URL>` — override `vault_addr` from config.
+- `--username <name>` — override `username` from config.
+- `--password-stdin` — read the password from stdin instead of prompting. Implies `--no-cache` (never writes to the keyring). Intended for CI/CD pipelines that supply the password via a platform secret.
+
+Together these three flags make `kvc` fully operable without a config file on disk, which is the normal state in an ephemeral CI runner:
+
+```sh
+echo "$VAULT_PASSWORD" | kvc up --vault-addr "$VAULT_ADDR" --username "$VAULT_USER" --password-stdin --no-cache
+```
 
 ## Token Caching — Two Modes
 
@@ -83,7 +91,7 @@ In any value position in compose YAML: `"@@<mount>/<path>#<key>@@"` (always doub
 - Everything between that first slash and the `#` is the path under the mount.
 - `<key>` (after `#`) is required — every placeholder must name which field of the secret to read.
 
-`"@@kv/myapp/db#password@@"` resolves to a GET against `<vault_addr>/v1/kv/data/myapp/db`, reading `data.data.password` from the KV v2 response.
+`"@@kv/db#password@@"` resolves to a GET against `<vault_addr>/v1/kv/data/db`, reading `data.data.password` from the KV v2 response.
 
 There is no `kv_mount` config setting — every placeholder names its own mount. This makes a single compose file capable of pulling from multiple mounts (e.g. a per-stack mount plus a shared-infra mount), and pushes ACL design entirely onto the user, where it belongs.
 
@@ -112,7 +120,8 @@ Many compose stacks externalise values into a `.env` file alongside the compose 
 kvc init
   Prompts for vault URL and username. Writes ~/.config/kvc/config.toml.
 
-kvc up [-f compose.yml] [--env-file PATH] [--no-env-file] [--no-cache] [--token-stdin]
+kvc up [-f compose.yml] [--env-file PATH] [--no-env-file] [--no-cache]
+       [--vault-addr URL] [--username NAME] [--password-stdin]
   Auth → fetch secrets → substitute compose + .env → pipe YAML to
   `docker compose --env-file /dev/null -f - up -d` with resolved env on the subprocess.
 
@@ -120,6 +129,7 @@ kvc down [-f compose.yml]
   Runs `docker compose down`. No secret fetching needed.
 
 kvc check [-f compose.yml] [--env-file PATH] [--no-env-file]
+          [--vault-addr URL] [--username NAME] [--password-stdin]
   Scans compose.yml AND the resolved .env (if present) for every
   @@<mount>/<path>#<key>@@ placeholder, GETs each from Vault, reports
   which are missing or unreadable. No deploy.
@@ -134,7 +144,7 @@ kvc logout
 
 - **No temp file written by `kvc`.** `docker compose -f - up -d` reads from stdin; `.env` values flow via subprocess env. `kvc` does not write plaintext anywhere on disk. Note: this is narrower than "no plaintext on disk anywhere" — Docker persists the container's env array in `/var/lib/docker/containers/<id>/config.v2.json` independently of how it was passed in.
 - **No password caching.** Ever. Only the bounded, revocable Vault token is cached.
-- **No password in argv or env.** TTY read only. Token-stdin mode reads from stdin.
+- **No password in argv or env.** TTY read or `--password-stdin` only. Never via argv flags or environment variables.
 - **No long-running daemon.** No socket exposure, no API surface, no RBAC layer to maintain.
 
 ## Known residual risks (must be in README)

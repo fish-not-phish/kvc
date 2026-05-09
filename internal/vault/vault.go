@@ -19,8 +19,8 @@ type Client struct {
 }
 
 type LoginOpts struct {
-	NoCache    bool
-	TokenStdin bool
+	NoCache       bool
+	PasswordStdin bool
 }
 
 func newAPI(addr string) (*vaultapi.Client, error) {
@@ -36,16 +36,27 @@ func Login(cfg *config.Config, opts LoginOpts) (*Client, error) {
 		return nil, err
 	}
 
-	if opts.TokenStdin {
+	if opts.PasswordStdin {
 		b, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			return nil, err
 		}
-		tok := strings.TrimSpace(string(b))
-		if tok == "" {
-			return nil, fmt.Errorf("--token-stdin: empty input")
+		defer zero(b)
+		pw := strings.TrimRight(string(b), "\r\n")
+		if pw == "" {
+			return nil, fmt.Errorf("--password-stdin: empty input")
 		}
-		c.SetToken(tok)
+		secret, err := c.Logical().Write(
+			"auth/userpass/login/"+cfg.Username,
+			map[string]interface{}{"password": pw},
+		)
+		if err != nil {
+			return nil, fmt.Errorf("userpass login: %w", err)
+		}
+		if secret == nil || secret.Auth == nil || secret.Auth.ClientToken == "" {
+			return nil, fmt.Errorf("userpass login: empty auth response")
+		}
+		c.SetToken(secret.Auth.ClientToken)
 		return &Client{api: c}, nil
 	}
 

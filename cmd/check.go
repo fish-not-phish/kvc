@@ -11,11 +11,13 @@ import (
 )
 
 var (
-	checkFile       string
-	checkEnvFile    string
-	checkNoEnvFile  bool
-	checkNoCache    bool
-	checkTokenStdin bool
+	checkFile          string
+	checkEnvFile       string
+	checkNoEnvFile     bool
+	checkNoCache       bool
+	checkPasswordStdin bool
+	checkVaultAddr     string
+	checkUsername      string
 )
 
 var checkCmd = &cobra.Command{
@@ -29,14 +31,28 @@ func init() {
 	checkCmd.Flags().StringVar(&checkEnvFile, "env-file", "", "path to .env (default: ./.env next to compose file, if present)")
 	checkCmd.Flags().BoolVar(&checkNoEnvFile, "no-env-file", false, "skip .env auto-detection entirely")
 	checkCmd.Flags().BoolVar(&checkNoCache, "no-cache", false, "skip kernel-keyring token cache")
-	checkCmd.Flags().BoolVar(&checkTokenStdin, "token-stdin", false, "read vault token from stdin")
+	checkCmd.Flags().BoolVar(&checkPasswordStdin, "password-stdin", false, "read vault password from stdin instead of prompting (implies --no-cache)")
+	checkCmd.Flags().StringVar(&checkVaultAddr, "vault-addr", "", "vault address, overrides config")
+	checkCmd.Flags().StringVar(&checkUsername, "username", "", "vault username, overrides config")
 	rootCmd.AddCommand(checkCmd)
 }
 
 func runCheck(_ *cobra.Command, _ []string) error {
-	cfg, err := config.Load()
+	cfg, err := config.LoadOptional()
 	if err != nil {
 		return err
+	}
+	if checkVaultAddr != "" {
+		cfg.VaultAddr = checkVaultAddr
+	}
+	if checkUsername != "" {
+		cfg.Username = checkUsername
+	}
+	if cfg.VaultAddr == "" {
+		return fmt.Errorf("vault address required: set vault_addr in config or pass --vault-addr")
+	}
+	if cfg.Username == "" {
+		return fmt.Errorf("vault username required: set username in config or pass --username")
 	}
 
 	checkFile, err = resolveComposeFile(checkFile)
@@ -77,8 +93,8 @@ func runCheck(_ *cobra.Command, _ []string) error {
 	}
 
 	client, err := vault.Login(cfg, vault.LoginOpts{
-		NoCache:    checkNoCache,
-		TokenStdin: checkTokenStdin,
+		NoCache:       checkNoCache,
+		PasswordStdin: checkPasswordStdin,
 	})
 	if err != nil {
 		return err

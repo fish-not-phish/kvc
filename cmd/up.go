@@ -14,11 +14,13 @@ import (
 )
 
 var (
-	upFile       string
-	upEnvFile    string
-	upNoEnvFile  bool
-	upNoCache    bool
-	upTokenStdin bool
+	upFile          string
+	upEnvFile       string
+	upNoEnvFile     bool
+	upNoCache       bool
+	upPasswordStdin bool
+	upVaultAddr     string
+	upUsername      string
 )
 
 var upCmd = &cobra.Command{
@@ -32,14 +34,28 @@ func init() {
 	upCmd.Flags().StringVar(&upEnvFile, "env-file", "", "path to .env (default: ./.env next to compose file, if present)")
 	upCmd.Flags().BoolVar(&upNoEnvFile, "no-env-file", false, "skip .env auto-detection entirely")
 	upCmd.Flags().BoolVar(&upNoCache, "no-cache", false, "skip kernel-keyring token cache")
-	upCmd.Flags().BoolVar(&upTokenStdin, "token-stdin", false, "read vault token from stdin instead of prompting")
+	upCmd.Flags().BoolVar(&upPasswordStdin, "password-stdin", false, "read vault password from stdin instead of prompting (implies --no-cache)")
+	upCmd.Flags().StringVar(&upVaultAddr, "vault-addr", "", "vault address, overrides config")
+	upCmd.Flags().StringVar(&upUsername, "username", "", "vault username, overrides config")
 	rootCmd.AddCommand(upCmd)
 }
 
 func runUp(_ *cobra.Command, _ []string) error {
-	cfg, err := config.Load()
+	cfg, err := config.LoadOptional()
 	if err != nil {
 		return err
+	}
+	if upVaultAddr != "" {
+		cfg.VaultAddr = upVaultAddr
+	}
+	if upUsername != "" {
+		cfg.Username = upUsername
+	}
+	if cfg.VaultAddr == "" {
+		return fmt.Errorf("vault address required: set vault_addr in config or pass --vault-addr")
+	}
+	if cfg.Username == "" {
+		return fmt.Errorf("vault username required: set username in config or pass --username")
 	}
 
 	upFile, err = resolveComposeFile(upFile)
@@ -73,8 +89,8 @@ func runUp(_ *cobra.Command, _ []string) error {
 		}
 	} else {
 		client, err := vault.Login(cfg, vault.LoginOpts{
-			NoCache:    upNoCache,
-			TokenStdin: upTokenStdin,
+			NoCache:       upNoCache,
+			PasswordStdin: upPasswordStdin,
 		})
 		if err != nil {
 			return err

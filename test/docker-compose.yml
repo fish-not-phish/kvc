@@ -1,20 +1,39 @@
+---
+# kvc smoketest — copy this into your stack directory and replace the
+# @@…@@ placeholders with real paths from your Vault KV v2 mount.
+#
+# Example Vault secrets to create before running:
+#
+#   vault kv put kv/db \
+#     username="appuser" \
+#     password="s3cr3t"
+#
+#   vault kv put kv/api \
+#     key="abc123"
+#
+# Then run:
+#   kvc check   # verify all placeholders resolve
+#   kvc up      # deploy
+
 services:
   smoketest:
     image: alpine:3
     container_name: kvc-smoketest
     environment:
-      # Inline placeholder — substituted in the YAML before docker sees it.
-      # Demonstrates pulling one key out of a multi-key Vault secret.
-      TEST_USER: "@@<mount>/<path>#<key>@@"
+      # Inline placeholder — kvc substitutes this directly in the YAML.
+      # Replace with your own mount/path#key.
+      DB_USERNAME: "@@kv/db#username@@"
+      DB_PASSWORD: "@@kv/db#password@@"
 
-      # ${VAR} interpolation — value lives in the .env file alongside this
-      # compose, where kvc resolves the placeholder and exposes it via
-      # subprocess env.
-      EXAMPLE_API_KEY: ${EXAMPLE_API_KEY}
+      # ${VAR} interpolation — placeholder lives in .env, kvc resolves it
+      # and passes the value via subprocess env.
+      API_KEY: ${API_KEY}
 
-      # Plain (non-secret) value passed through .env.
-      LOG_LEVEL: ${LOG_LEVEL}
 
-      # Plain (non-secret) value inline.
-      APP_NAME: kvc-smoketest
-    command: sh -c 'env | grep -E "^(TEST_USER|EXAMPLE_API_KEY|LOG_LEVEL|APP_NAME)="; tail -f /dev/null'
+      # Plain value — passed through as-is.
+      APP_ENV: production
+    command: >
+      sh -c 'echo "DB_USERNAME=$DB_USERNAME" &&
+             echo "DB_PASSWORD=$DB_PASSWORD" &&
+             echo "API_KEY=$API_KEY" &&
+             echo "APP_ENV=$APP_ENV"'

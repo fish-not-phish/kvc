@@ -42,6 +42,25 @@ func Load() (*Config, error) {
 	return &c, nil
 }
 
+// LoadOptional loads the config file if it exists. If the file is absent it
+// returns an empty Config (no error) so callers can populate fields from CLI
+// flags. A parse error on an existing file is still returned as an error.
+func LoadOptional() (*Config, error) {
+	p := Path()
+	var c Config
+	if _, err := toml.DecodeFile(p, &c); err != nil {
+		if os.IsNotExist(err) {
+			c.KeyringMaxTTL = "8h"
+			return &c, nil
+		}
+		return nil, err
+	}
+	if c.KeyringMaxTTL == "" {
+		c.KeyringMaxTTL = "8h"
+	}
+	return &c, nil
+}
+
 func (c *Config) Save() error {
 	p := Path()
 	if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {

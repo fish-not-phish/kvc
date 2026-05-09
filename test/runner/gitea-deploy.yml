@@ -1,0 +1,50 @@
+---
+# Drop this file into your Docker stack repo at:
+#   .gitea/workflows/deploy.yml
+#
+# Your repo only needs to contain your compose file(s) and optional .env —
+# kvc is installed automatically by this workflow.
+#
+# One-time setup:
+#   1. Register a self-hosted act_runner on your Docker host
+#      (repo → Settings → Actions → Runners → Create Runner)
+#   2. Ensure the runner user is in the docker group
+#   3. Add three secrets (repo → Settings → Secrets and Variables → Actions):
+#        VAULT_ADDR      https://vault.example.com:8200
+#        VAULT_USER      your vault userpass username
+#        VAULT_PASSWORD  your vault userpass password
+
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install kvc
+        run: |
+          if ! command -v kvc >/dev/null 2>&1; then
+            go install github.com/fish-not-phish/kvc@latest
+            echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Verify secrets resolve
+        run: |
+          echo "${{ secrets.VAULT_PASSWORD }}" | kvc check \
+            --vault-addr "${{ secrets.VAULT_ADDR }}" \
+            --username "${{ secrets.VAULT_USER }}" \
+            --password-stdin --no-cache
+
+      - name: Deploy
+        run: |
+          echo "${{ secrets.VAULT_PASSWORD }}" | kvc up \
+            --vault-addr "${{ secrets.VAULT_ADDR }}" \
+            --username "${{ secrets.VAULT_USER }}" \
+            --password-stdin --no-cache

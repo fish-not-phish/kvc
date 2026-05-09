@@ -32,3 +32,6 @@ Thumbs.db
 # Claude Code local overrides (project-level settings.json may be shared, but
 # the *.local.json variant is per-user — never commit it).
 .claude/settings.local.json
+
+# Local notes — not part of the project
+PUSH.md

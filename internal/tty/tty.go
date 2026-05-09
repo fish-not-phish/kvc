@@ -21,7 +21,7 @@ func Prompt(msg string) (string, error) {
 func PromptPassword(msg string) ([]byte, error) {
 	fd := int(os.Stdin.Fd())
 	if !term.IsTerminal(fd) {
-		return nil, fmt.Errorf("password prompt requires a TTY (use --token-stdin for scripted deploys)")
+		return nil, fmt.Errorf("password prompt requires a TTY (use --password-stdin for scripted deploys)")
 	}
 	fmt.Fprint(os.Stderr, msg)
 	pw, err := term.ReadPassword(fd)

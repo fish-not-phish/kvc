@@ -25,8 +25,8 @@ API_TOKEN=sk-abc123
 
 ```sh
 # .env
-DB_PASSWORD=@@kv/myapp/db#password@@
-API_TOKEN=@@kv/myapp/api#token@@
+DB_PASSWORD=@@kv/db#password@@
+API_TOKEN=@@kv/api#token@@
 ```
 
 ```sh
@@ -51,7 +51,7 @@ exfiltrated, every credential in the file is compromised, and rotating
 across many stacks is painful and incomplete.
 
 With kvc, those files contain only placeholders like
-`"@@kv/myapp/db#password@@"`. Plaintext exists only in Vault (encrypted
+`"@@kv/db#password@@"`. Plaintext exists only in Vault (encrypted
 at rest, audited, ACL'd), briefly in the `kvc` and `docker compose`
 processes during `up`, and (once the stack is running) in Docker's
 own container state files (see [threat model](#threat-model)).
@@ -261,22 +261,68 @@ that won't resolve.
 ## Commands
 
 ```
-kvc init                        Set up ~/.config/kvc/config.toml.
-kvc up [-f FILE]                Auth, fetch secrets, pipe to `docker compose up -d`.
-       [--env-file PATH]              Override .env auto-detection.
-       [--no-env-file]                Skip .env auto-detection entirely.
-       [--no-cache]                   Skip the kernel-keyring token cache.
-       [--token-stdin]                Read a Vault token from stdin instead of prompting.
-kvc down [-f FILE]              `docker compose down` (no secrets needed).
-kvc check [-f FILE]             Verify every placeholder resolves in Vault. No deploy.
-       [--env-file PATH]              Same .env semantics as `up`.
+kvc init                         Set up ~/.config/kvc/config.toml.
+kvc up [-f FILE]                 Auth, fetch secrets, pipe to `docker compose up -d`.
+       [--env-file PATH]         Override .env auto-detection.
+       [--no-env-file]           Skip .env entirely.
+       [--no-cache]              Skip the kernel-keyring token cache.
+       [--vault-addr URL]        Vault address (overrides config).
+       [--username NAME]         Vault username (overrides config).
+       [--password-stdin]        Read password from stdin; implies --no-cache.
+kvc down [-f FILE]               `docker compose down` (no secrets needed).
+kvc check [-f FILE]              Verify every placeholder resolves in Vault. No deploy.
+       [--env-file PATH]         Same .env semantics as `up`.
        [--no-env-file]
-kvc logout                      Revoke the cached token and clear the keyring entry.
+       [--vault-addr URL]
+       [--username NAME]
+       [--password-stdin]
+kvc logout                       Revoke the cached token and clear the keyring entry.
 ```
+
+`--vault-addr` and `--username` each override the corresponding config value.
+When both are supplied, no config file is required — useful in CI environments
+where writing a config file is inconvenient.
 
 If `-f` is omitted, kvc searches the cwd in this order and uses the
 first that exists: `compose.yaml`, `compose.yml`, `docker-compose.yaml`,
 `docker-compose.yml`. (Same precedence docker compose itself uses.)
+
+## CI/CD
+
+kvc works in CI/CD pipelines via `--password-stdin`. The typical setup for
+homelabbers is a **self-hosted runner** on the Docker host — the runner and
+Docker are on the same machine, so `kvc up` deploys locally without any SSH
+hop.
+
+**One-time runner setup:**
+
+1. Register a self-hosted runner on your Docker host (GitHub, Gitea, and
+   GitLab all have a registration script under repo → Settings → Actions →
+   Runners).
+2. Ensure the runner user is in the `docker` group.
+3. Add three secrets to your repo: `VAULT_ADDR`, `VAULT_USER`, `VAULT_PASSWORD`.
+
+**Your stack repo** only needs the compose file(s) and optional `.env` — no
+kvc source. Copy a workflow template from
+[`test/runner/`](test/runner/) into your repo:
+
+```
+test/runner/gitea-deploy.yml  →  .gitea/workflows/deploy.yml
+test/runner/github-deploy.yml →  .github/workflows/deploy.yml
+```
+
+The workflow installs kvc automatically if it isn't already on the runner,
+then runs:
+
+```sh
+echo "$VAULT_PASSWORD" | kvc up \
+  --vault-addr "$VAULT_ADDR" \
+  --username "$VAULT_USER" \
+  --password-stdin --no-cache
+```
+
+No config file needed on the runner — `--vault-addr` and `--username` supply
+everything `kvc init` would normally write.
 
 ## Token caching
 

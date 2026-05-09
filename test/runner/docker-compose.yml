@@ -1,0 +1,39 @@
+---
+# Runner integration test for kvc CI/CD workflows.
+#
+# Before running, create the following secrets in your Vault KV v2 mount:
+#
+#   vault kv put kv/runner \
+#     greeting="hello from vault" \
+#     api_key="test-api-key-abc123"
+#
+# Then run manually to verify before wiring up CI:
+#
+#   echo "$VAULT_PASSWORD" | kvc check \
+#     --vault-addr "$VAULT_ADDR" --username "$VAULT_USER" \
+#     --password-stdin --no-cache -f test/runner/docker-compose.yml
+#
+#   echo "$VAULT_PASSWORD" | kvc up \
+#     --vault-addr "$VAULT_ADDR" --username "$VAULT_USER" \
+#     --password-stdin --no-cache -f test/runner/docker-compose.yml
+
+services:
+  kvc-runner-test:
+    image: alpine:3
+    container_name: kvc-runner-test
+    environment:
+      # Inline placeholder — substituted in YAML before docker sees it.
+      GREETING: "@@kv/runner#greeting@@"
+
+      # ${VAR} interpolation — placeholder lives in .env, kvc resolves it
+      # and passes the value via subprocess env.
+      RUNNER_API_KEY: ${RUNNER_API_KEY}
+
+      # Plain value to confirm pass-through.
+      TEST_LABEL: kvc-runner-integration
+    command: >
+      sh -c 'echo "--- kvc runner test ---" &&
+             echo "GREETING=$GREETING" &&
+             echo "RUNNER_API_KEY=$RUNNER_API_KEY" &&
+             echo "TEST_LABEL=$TEST_LABEL" &&
+             echo "--- done ---"'
