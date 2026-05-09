@@ -27,13 +27,13 @@ services:
 
       # ${VAR} interpolation — placeholder lives in .env, kvc resolves it
       # and passes the value via subprocess env.
-      RUNNER_API_KEY: ${RUNNER_API_KEY}
+      TEST_API_KEY: ${TEST_API_KEY}
 
       # Plain value to confirm pass-through.
       TEST_LABEL: kvc-runner-integration
     command: >
       sh -c 'echo "--- kvc runner test ---" &&
-             echo "GREETING=$GREETING" &&
-             echo "RUNNER_API_KEY=$RUNNER_API_KEY" &&
-             echo "TEST_LABEL=$TEST_LABEL" &&
+             echo "GREETING=$$GREETING" &&
+             echo "TEST_API_KEY=$$TEST_API_KEY" &&
+             echo "TEST_LABEL=$$TEST_LABEL" &&
              echo "--- done ---"'

@@ -290,38 +290,53 @@ first that exists: `compose.yaml`, `compose.yml`, `docker-compose.yaml`,
 ## CI/CD
 
 kvc works in CI/CD pipelines via `--password-stdin`. The typical setup for
-homelabbers is a **self-hosted runner** on the Docker host — the runner and
+homelabbers is a **self-hosted runner** on the Docker host, the runner and
 Docker are on the same machine, so `kvc up` deploys locally without any SSH
 hop.
 
 **One-time runner setup:**
 
 1. Register a self-hosted runner on your Docker host (GitHub, Gitea, and
-   GitLab all have a registration script under repo → Settings → Actions →
+   GitLab all have a registration script under repo → Settings → Actions/CI →
    Runners).
-2. Ensure the runner user is in the `docker` group.
-3. Add three secrets to your repo: `VAULT_ADDR`, `VAULT_USER`, `VAULT_PASSWORD`.
+2. Note the label/tag assigned to your runner, the workflow's `runs-on` (GitHub/Gitea)
+   or `tags:` (GitLab) must match it exactly, or jobs will sit in "Waiting" forever.
+3. Ensure the runner user is in the `docker` group.
+4. Add three secrets to your repo: `VAULT_ADDR`, `VAULT_USER`, `VAULT_PASSWORD`.
 
-**Your stack repo** only needs the compose file(s) and optional `.env` — no
+**Your stack repo** only needs the compose file(s) and optional `.env`, no
 kvc source. Copy a workflow template from
 [`test/runner/`](test/runner/) into your repo:
 
-```
-test/runner/gitea-deploy.yml  →  .gitea/workflows/deploy.yml
-test/runner/github-deploy.yml →  .github/workflows/deploy.yml
-```
+| Platform | Template | Destination |
+|----------|----------|-------------|
+| Gitea    | `test/runner/gitea-deploy.yml`  | `.gitea/workflows/deploy.yml`  |
+| GitHub   | `test/runner/github-deploy.yml` | `.github/workflows/deploy.yml` |
+| GitLab   | `test/runner/gitlab-ci.yml`     | `.gitlab-ci.yml`               |
 
-The workflow installs kvc automatically if it isn't already on the runner,
-then runs:
+The workflow installs Go and kvc automatically if they aren't already on the
+runner, then runs:
 
 ```sh
+# GitHub / Gitea  (${{ secrets.NAME }} syntax)
+echo "${{ secrets.VAULT_PASSWORD }}" | kvc check \
+  --vault-addr "${{ secrets.VAULT_ADDR }}" \
+  --username "${{ secrets.VAULT_USER }}" \
+  --password-stdin --no-cache
+
+echo "${{ secrets.VAULT_PASSWORD }}" | kvc up \
+  --vault-addr "${{ secrets.VAULT_ADDR }}" \
+  --username "${{ secrets.VAULT_USER }}" \
+  --password-stdin --no-cache
+
+# GitLab  ($VARIABLE_NAME syntax)
 echo "$VAULT_PASSWORD" | kvc up \
   --vault-addr "$VAULT_ADDR" \
   --username "$VAULT_USER" \
   --password-stdin --no-cache
 ```
 
-No config file needed on the runner — `--vault-addr` and `--username` supply
+No config file needed on the runner, `--vault-addr` and `--username` supply
 everything `kvc init` would normally write.
 
 ## Token caching

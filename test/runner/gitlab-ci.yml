@@ -1,0 +1,64 @@
+---
+# Drop this file into your Docker stack repo as:
+#   .gitlab-ci.yml
+#
+# Your repo only needs to contain your compose file(s) and optional .env —
+# kvc is installed automatically by this pipeline.
+#
+# One-time setup:
+#   1. Register a self-hosted GitLab runner on your Docker host (shell executor)
+#      (repo → Settings → CI/CD → Runners → New project runner)
+#   2. Set a tag on the runner and update the tags: field below to match
+#   3. Ensure the runner user is in the docker group
+#   4. Add three CI/CD variables (Settings → CI/CD → Variables, mask each one):
+#        VAULT_ADDR      https://vault.example.com:8200
+#        VAULT_USER      your vault userpass username
+#        VAULT_PASSWORD  your vault userpass password
+
+stages:
+  - verify
+  - deploy
+
+variables:
+  GOPATH: $CI_PROJECT_DIR/.go
+
+.kvc_install: &kvc_install |
+  export PATH="$GOPATH/bin:$PATH"
+  if ! command -v kvc >/dev/null 2>&1; then
+    if ! command -v go >/dev/null 2>&1; then
+      echo "Go not found — installing..."
+      curl -fsSL https://go.dev/dl/go1.22.3.linux-amd64.tar.gz | tar -C /usr/local -xz
+      export PATH="/usr/local/go/bin:$PATH"
+    fi
+    go install github.com/fish-not-phish/kvc@latest
+  fi
+
+verify:
+  stage: verify
+  tags:
+    - self-hosted  # match the tag of your runner
+  before_script:
+    - *kvc_install
+  script:
+    - |
+      echo "$VAULT_PASSWORD" | kvc check \
+        --vault-addr "$VAULT_ADDR" \
+        --username "$VAULT_USER" \
+        --password-stdin --no-cache
+  only:
+    - main
+
+deploy:
+  stage: deploy
+  tags:
+    - self-hosted  # match the tag of your runner
+  before_script:
+    - *kvc_install
+  script:
+    - |
+      echo "$VAULT_PASSWORD" | kvc up \
+        --vault-addr "$VAULT_ADDR" \
+        --username "$VAULT_USER" \
+        --password-stdin --no-cache
+  only:
+    - main

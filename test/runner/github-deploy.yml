@@ -8,8 +8,9 @@
 # One-time setup:
 #   1. Register a self-hosted runner on your Docker host
 #      (repo → Settings → Actions → Runners → New self-hosted runner)
-#   2. Ensure the runner user is in the docker group
-#   3. Add three secrets (repo → Settings → Secrets and variables → Actions):
+#   2. Set the runner label to match runs-on below (e.g. self-hosted)
+#   3. Ensure the runner user is in the docker group
+#   4. Add three secrets (repo → Settings → Secrets and variables → Actions):
 #        VAULT_ADDR      https://vault.example.com:8200
 #        VAULT_USER      your vault userpass username
 #        VAULT_PASSWORD  your vault userpass password
@@ -23,10 +24,15 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
+    runs-on: self-hosted # Match the label of your runner
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
 
       - name: Install kvc
         run: |
