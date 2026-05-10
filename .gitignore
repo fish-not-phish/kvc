@@ -35,3 +35,5 @@ Thumbs.db
 
 # Local notes — not part of the project
 PUSH.md
+kvc-linux-amd64
+kvc-linux-arm64
