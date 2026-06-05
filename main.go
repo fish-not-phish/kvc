@@ -10,7 +10,7 @@ import (
 // version is set to the current release. Override at build time with
 // -ldflags "-X main.version=<value>" (the Makefile and install.sh do this
 // when a git tag is available, falling back to this default otherwise).
-var version = "v1.0.0"
+var version = "v1.0.2"
 
 func main() {
 	cmd.Version = version
