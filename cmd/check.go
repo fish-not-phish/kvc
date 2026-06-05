@@ -18,6 +18,9 @@ var (
 	checkPasswordStdin bool
 	checkVaultAddr     string
 	checkUsername      string
+	checkToken         string
+	checkRoleID        string
+	checkSecretIDStdin bool
 )
 
 var checkCmd = &cobra.Command{
@@ -34,6 +37,9 @@ func init() {
 	checkCmd.Flags().BoolVar(&checkPasswordStdin, "password-stdin", false, "read vault password from stdin instead of prompting (implies --no-cache)")
 	checkCmd.Flags().StringVar(&checkVaultAddr, "vault-addr", "", "vault address, overrides config")
 	checkCmd.Flags().StringVar(&checkUsername, "username", "", "vault username, overrides config")
+	checkCmd.Flags().StringVar(&checkToken, "token", "", "vault token (skips userpass auth; VAULT_TOKEN env is also accepted)")
+	checkCmd.Flags().StringVar(&checkRoleID, "role-id", "", "vault AppRole role ID (VAULT_ROLE_ID env or role_id config also accepted)")
+	checkCmd.Flags().BoolVar(&checkSecretIDStdin, "secret-id-stdin", false, "read AppRole secret ID from stdin (implies --no-cache)")
 	rootCmd.AddCommand(checkCmd)
 }
 
@@ -51,7 +57,9 @@ func runCheck(_ *cobra.Command, _ []string) error {
 	if cfg.VaultAddr == "" {
 		return fmt.Errorf("vault address required: set vault_addr in config or pass --vault-addr")
 	}
-	if cfg.Username == "" {
+	usingToken := checkToken != "" || os.Getenv("VAULT_TOKEN") != ""
+	usingAppRole := checkRoleID != "" || os.Getenv("VAULT_ROLE_ID") != "" || cfg.RoleID != ""
+	if !usingToken && !usingAppRole && cfg.Username == "" {
 		return fmt.Errorf("vault username required: set username in config or pass --username")
 	}
 
@@ -95,6 +103,9 @@ func runCheck(_ *cobra.Command, _ []string) error {
 	client, err := vault.Login(cfg, vault.LoginOpts{
 		NoCache:       checkNoCache,
 		PasswordStdin: checkPasswordStdin,
+		Token:         checkToken,
+		RoleID:        checkRoleID,
+		SecretIDStdin: checkSecretIDStdin,
 	})
 	if err != nil {
 		return err

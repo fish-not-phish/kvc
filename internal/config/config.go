@@ -12,6 +12,7 @@ import (
 type Config struct {
 	VaultAddr     string `toml:"vault_addr"`
 	Username      string `toml:"username"`
+	RoleID        string `toml:"role_id"`
 	CacheTokens   bool   `toml:"cache_tokens"`
 	KeyringMaxTTL string `toml:"keyring_max_ttl"`
 }

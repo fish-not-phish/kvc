@@ -21,10 +21,16 @@ var (
 	upPasswordStdin bool
 	upVaultAddr     string
 	upUsername      string
+	upForceRecreate bool
+	upNoRecreate    bool
+	upRemoveOrphans bool
+	upToken         string
+	upRoleID        string
+	upSecretIDStdin bool
 )
 
 var upCmd = &cobra.Command{
-	Use:   "up",
+	Use:   "up [-- DOCKER_COMPOSE_ARGS...]",
 	Short: "Auth, fetch secrets, substitute, and pipe to docker compose up -d",
 	RunE:  runUp,
 }
@@ -37,10 +43,16 @@ func init() {
 	upCmd.Flags().BoolVar(&upPasswordStdin, "password-stdin", false, "read vault password from stdin instead of prompting (implies --no-cache)")
 	upCmd.Flags().StringVar(&upVaultAddr, "vault-addr", "", "vault address, overrides config")
 	upCmd.Flags().StringVar(&upUsername, "username", "", "vault username, overrides config")
+	upCmd.Flags().BoolVar(&upForceRecreate, "force-recreate", false, "force recreate containers even if config hasn't changed")
+	upCmd.Flags().BoolVar(&upNoRecreate, "no-recreate", false, "don't recreate containers if their config hasn't changed")
+	upCmd.Flags().BoolVar(&upRemoveOrphans, "remove-orphans", false, "remove containers for services not defined in the compose file")
+	upCmd.Flags().StringVar(&upToken, "token", "", "vault token (skips userpass auth; VAULT_TOKEN env is also accepted)")
+	upCmd.Flags().StringVar(&upRoleID, "role-id", "", "vault AppRole role ID (VAULT_ROLE_ID env or role_id config also accepted)")
+	upCmd.Flags().BoolVar(&upSecretIDStdin, "secret-id-stdin", false, "read AppRole secret ID from stdin (implies --no-cache)")
 	rootCmd.AddCommand(upCmd)
 }
 
-func runUp(_ *cobra.Command, _ []string) error {
+func runUp(_ *cobra.Command, passthroughArgs []string) error {
 	cfg, err := config.LoadOptional()
 	if err != nil {
 		return err
@@ -54,7 +66,9 @@ func runUp(_ *cobra.Command, _ []string) error {
 	if cfg.VaultAddr == "" {
 		return fmt.Errorf("vault address required: set vault_addr in config or pass --vault-addr")
 	}
-	if cfg.Username == "" {
+	usingToken := upToken != "" || os.Getenv("VAULT_TOKEN") != ""
+	usingAppRole := upRoleID != "" || os.Getenv("VAULT_ROLE_ID") != "" || cfg.RoleID != ""
+	if !usingToken && !usingAppRole && cfg.Username == "" {
 		return fmt.Errorf("vault username required: set username in config or pass --username")
 	}
 
@@ -91,6 +105,9 @@ func runUp(_ *cobra.Command, _ []string) error {
 		client, err := vault.Login(cfg, vault.LoginOpts{
 			NoCache:       upNoCache,
 			PasswordStdin: upPasswordStdin,
+			Token:         upToken,
+			RoleID:        upRoleID,
+			SecretIDStdin: upSecretIDStdin,
 		})
 		if err != nil {
 			return err
@@ -118,7 +135,18 @@ func runUp(_ *cobra.Command, _ []string) error {
 		}
 	}
 
-	return runDockerCompose(upFile, rendered, extraEnv, "up", "-d")
+	upArgs := []string{"up", "-d"}
+	if upForceRecreate {
+		upArgs = append(upArgs, "--force-recreate")
+	}
+	if upNoRecreate {
+		upArgs = append(upArgs, "--no-recreate")
+	}
+	if upRemoveOrphans {
+		upArgs = append(upArgs, "--remove-orphans")
+	}
+	upArgs = append(upArgs, passthroughArgs...)
+	return runDockerCompose(upFile, rendered, extraEnv, upArgs...)
 }
 
 func runDockerCompose(composeFile string, yaml []byte, extraEnv []string, args ...string) error {
